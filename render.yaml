@@ -6,7 +6,7 @@ services:
     plan: starter
     region: singapore
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && python manage.py seed_catalogue_snapshot && python manage.py ensure_deploy_admin && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate --noinput && python manage.py seed_catalogue_snapshot && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /api/products/
     disk:
       name: renewkart-data
