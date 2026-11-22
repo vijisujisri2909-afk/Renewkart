@@ -624,17 +624,21 @@ function Shop() {
       max_price: category !== state.category ? "" : maxPrice,
     }));
   }, [params]);
-  const fetchProducts = useCallback(() => {
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setProductError("");
     const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ""));
-    api.get("/products/", { params: query }).then(({ data }) => setProducts(data.results || data)).catch((error) => {
+    api.get("/products/", { params: query, signal: controller.signal }).then(({ data }) => setProducts(data.results || data)).catch((error) => {
+      if (controller.signal.aborted) return;
       setProducts([]);
       setProductError(errorMessage(error));
       notify(errorMessage(error));
-    }).finally(() => setLoading(false));
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
   }, [filters, notify]);
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
   const update = (key, value) => setFilters((state) => ({ ...state, [key]: value }));
   const brands = [...new Set(products.map((product) => product.brand).filter(Boolean))].sort();
   const applyPriceFilter = (minPrice, maxPrice) => setFilters((state) => ({ ...state, min_price: minPrice, max_price: maxPrice }));
@@ -840,6 +844,9 @@ function Checkout() {
           },
           modal: { ondismiss: () => notify("Payment window closed. Your order is still pending payment.") },
         });
+        checkout.on("payment.failed", ({ error }) => {
+          notify(error?.description || error?.reason || "Payment failed. Please try again or choose Cash on Delivery.");
+        });
         checkout.open();
       }
     } catch (error) { notify(errorMessage(error)); }
@@ -860,15 +867,28 @@ function Checkout() {
     </form>
   </main>;
 }
+let razorpayScriptPromise;
+
 async function loadRazorpay() {
   if (window.Razorpay) return;
-  await new Promise((resolve, reject) => {
+  if (!razorpayScriptPromise) {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("Could not load Razorpay checkout. Check your internet connection."));
-    document.body.appendChild(script);
-  });
+    razorpayScriptPromise = new Promise((resolve, reject) => {
+      script.onload = resolve;
+      script.onerror = () => {
+        script.remove();
+        razorpayScriptPromise = null;
+        reject(new Error("Could not load Razorpay checkout. Check your internet connection and try again."));
+      };
+      document.body.appendChild(script);
+    });
+  }
+  await razorpayScriptPromise;
+  if (!window.Razorpay) {
+    razorpayScriptPromise = null;
+    throw new Error("Razorpay checkout did not initialize. Please try again.");
+  }
 }
 
 function Orders() {

@@ -113,8 +113,8 @@ def api_root(request):
 
 
 def _razorpay_client():
-    key_id = os.getenv("RAZORPAY_KEY_ID", "")
-    key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+    key_id = os.getenv("RAZORPAY_KEY_ID", "").strip()
+    key_secret = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
     if not key_id or not key_secret:
         return None, None
     return razorpay.Client(auth=(key_id, key_secret)), key_id
@@ -282,9 +282,12 @@ class ProductListView(generics.ListAPIView):
         queryset = Product.objects.filter(is_active=True, stock__gte=0).select_related("category")
         params = self.request.query_params
         search = params.get("search", "").strip()
-        if search:
-            queryset = queryset.filter(name__icontains=search) | queryset.filter(brand__icontains=search)
-            queryset = queryset.distinct().filter(is_active=True)
+        for term in search.split():
+            queryset = queryset.filter(
+                Q(name__icontains=term)
+                | Q(brand__icontains=term)
+                | Q(category__name__icontains=term)
+            )
         category = params.get("category", "").strip()
         if category:
             category_aliases = {
@@ -459,7 +462,12 @@ class RazorpayCreateOrderView(APIView):
         client, key_id = _razorpay_client()
         if client is None:
             return Response(
-                {"detail": "Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to backend/.env."},
+                {
+                    "detail": (
+                        "Razorpay is not configured. Set both RAZORPAY_KEY_ID and "
+                        "RAZORPAY_KEY_SECRET in the backend environment."
+                    )
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         address = generics.get_object_or_404(Address, pk=request.data.get("address_id"), user=request.user)
@@ -496,7 +504,15 @@ class RazorpayVerifyView(APIView):
     def post(self, request):
         client, _ = _razorpay_client()
         if client is None:
-            return Response({"detail": "Razorpay is not configured."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response(
+                {
+                    "detail": (
+                        "Razorpay is not configured. Set both RAZORPAY_KEY_ID and "
+                        "RAZORPAY_KEY_SECRET in the backend environment."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         order = generics.get_object_or_404(
             Order, order_number=request.data.get("order_number"), user=request.user, payment_method="razorpay"
         )

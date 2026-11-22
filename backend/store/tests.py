@@ -162,6 +162,28 @@ class StoreFlowTests(APITestCase):
         empty_response = self.client.get("/api/products/", {"min_price": "1", "max_price": "50"})
         self.assertEqual(empty_response.data["count"], 0)
 
+    def test_product_search_matches_all_terms_in_names_brands_and_categories(self):
+        call_command("seed_store")
+
+        product_response = self.client.get("/api/products/", {"search": "Samsung Galaxy S22"})
+        self.assertEqual(product_response.data["count"], 1)
+        self.assertEqual(product_response.data["results"][0]["slug"], "samsung-galaxy-s22")
+
+        category_response = self.client.get("/api/products/", {"search": "mobiles"})
+        self.assertGreater(category_response.data["count"], 1)
+        self.assertTrue(all(product["category_name"] == "Mobiles" for product in category_response.data["results"]))
+
+        unrelated_terms_response = self.client.get("/api/products/", {"search": "iphone laptop"})
+        self.assertEqual(unrelated_terms_response.data["count"], 0)
+
+    def test_razorpay_create_reports_missing_backend_credentials(self):
+        with patch.dict("os.environ", {"RAZORPAY_KEY_ID": "", "RAZORPAY_KEY_SECRET": ""}):
+            response = self.client.post("/api/payments/razorpay/create/", {}, format="json")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("RAZORPAY_KEY_ID", response.data["detail"])
+        self.assertIn("RAZORPAY_KEY_SECRET", response.data["detail"])
+
     def test_category_filter_accepts_singular_plural_and_case_variants(self):
         for category in ("mobile", "Mobile", "Mobiles", "mobiles"):
             with self.subTest(category=category):

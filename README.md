@@ -88,7 +88,7 @@ The root `render.yaml` defines a Django API service, a Vite static site and a Po
 2. PostgreSQL uses Render's internal connection URL. The persistent disk mounted at `/var/data` stores uploaded media only.
 3. Set `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, and a unique, strong `DJANGO_SUPERUSER_PASSWORD` in Render. The password is not stored in `render.yaml`; an existing account's password is not reset on each restart.
 4. Enter SMTP credentials when prompted. Password reset uses SMTP when `DJANGO_DEBUG=0`; production startup intentionally fails if `EMAIL_HOST` is missing.
-5. Enter Razorpay **Test Mode** keys if online checkout should be enabled. Without those keys, the API keeps Cash on Delivery available and returns an explicit configuration error for Razorpay.
+5. To enable online checkout, set both `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in the Render **API service** environment. Use a matching key pair from the same Razorpay mode; these are backend secrets, not Vercel frontend variables. Without them, the API keeps Cash on Delivery available and returns an explicit configuration error for Razorpay.
 6. Confirm the API responds at `https://renewkart-api.onrender.com/api/products/` and `https://renewkart-api.onrender.com/api/categories/`, then open the frontend at `https://renewkart-web.onrender.com`. If you change either service's Render domain, update `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`, and `VITE_API_URL` to match.
 
 ## Deploy the frontend to Vercel
