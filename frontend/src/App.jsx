@@ -13,6 +13,7 @@ const StoreContext = createContext(null);
 const useStore = () => useContext(StoreContext);
 const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 const imageFallback = "/images/banners/book-fallback.jpg";
+const productImageFallback = "/images/products/apple-iphone-13.jpg";
 const conditionText = { like_new: "Like New", good: "Good", average: "Average" };
 const localProductImage = (product = {}) => {
   const image = typeof product === "string" ? "" : product.image;
@@ -21,6 +22,7 @@ const localProductImage = (product = {}) => {
     const apiOrigin = new URL(api.defaults.baseURL, window.location.origin).origin;
     return new URL(image, apiOrigin).href;
   }
+  if (image?.startsWith("http://") || image?.startsWith("https://")) return image;
   const name = typeof product === "string" ? product : product.slug || product.product_slug || product.product_name || product.name || "";
   const slug = name.toLowerCase().replace(/&/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return slug ? `/images/products/${slug}.jpg` : imageFallback;
@@ -350,11 +352,26 @@ function PageIntro({ eyebrow, title, text }) {
   return <div className="bg-[#edf3e9] px-5 py-12 sm:px-10 sm:py-16"><div className="mx-auto max-w-[1400px]"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.2em] text-[#71905c]">{eyebrow}</p><h1 className="font-display text-4xl font-extrabold tracking-[-1.8px] text-[#203629] sm:text-5xl">{title}</h1>{text && <p className="mt-3 max-w-2xl text-sm leading-6 text-[#667769] sm:text-base">{text}</p>}</div></div>;
 }
 function ProductCard({ product, compact = false }) {
-  const { addCart, toggleWish, wish } = useStore();
+  const { addCart, toggleWish, wish, user, notify, refreshCounts } = useStore();
+  const navigate = useNavigate();
   const saved = wish.some((item) => item.product.id === product.id);
+  const buyNow = async () => {
+    if (!user) {
+      notify("Sign in to continue with your purchase.");
+      navigate("/login");
+      return;
+    }
+    try {
+      await api.post("/cart/", { product_id: product.id, quantity: 1 });
+      await refreshCounts();
+      navigate("/checkout");
+    } catch (error) {
+      notify(errorMessage(error));
+    }
+  };
   return <article className={`group overflow-hidden rounded-[20px] border border-[#e9ede6] bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_38px_-22px_rgba(27,52,33,.25)] ${compact ? "" : ""}`}>
     <div className="relative aspect-[1.17/1] overflow-hidden bg-[#eff2ed]">
-      <Link to={`/product/${product.slug}`}><img src={localProductImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-110" onError={(e) => { e.currentTarget.src = imageFallback; }} /></Link>
+      <Link to={`/product/${product.slug}`}><img src={localProductImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-110" onError={(e) => { e.currentTarget.src = productImageFallback; }} /></Link>
       <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold text-[#4c654d]">{conditionText[product.condition] || product.condition_label}</span>
       {product.old_price && <span className="absolute bottom-3 left-3 rounded-full bg-[#e4efdc] px-2.5 py-1 text-[10px] font-bold text-[#4e794a]">{Math.round((1 - product.price / product.old_price) * 100)}% less</span>}
       <button onClick={() => toggleWish(product)} aria-label={saved ? "Remove from wishlist" : "Add to wishlist"} className={`absolute right-3 top-3 grid size-9 place-items-center rounded-full shadow-sm transition ${saved ? "bg-[#fff0ef] text-[#d6655e]" : "bg-white/95 text-[#526056] hover:text-[#d6655e]"}`}><Heart size={17} fill={saved ? "currentColor" : "none"} /></button>
@@ -363,7 +380,11 @@ function ProductCard({ product, compact = false }) {
       <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#94a094]">{product.brand || product.category_name}</p>
       <Link to={`/product/${product.slug}`} className="mt-1 block min-h-10 font-display text-sm font-bold leading-5 text-[#283b2e] hover:text-[#638c50]">{product.name}</Link>
       <div className="mt-2 flex items-center gap-1.5"><Star size={13} className="fill-[#dfaa48] text-[#dfaa48]" /><span className="text-xs font-bold text-[#4d5e51]">{Number(product.rating || 0).toFixed(1)}</span><span className="text-[10px] text-[#a0a9a0]">({product.ratings_count || 0})</span></div>
-      <div className="mt-3 flex items-center justify-between gap-2"><div><span className="product-price font-display text-base font-extrabold text-[#23372b]">{money(product.price)}</span>{product.old_price && <span className="ml-1.5 text-[11px] text-[#9ca69c] line-through">{money(product.old_price)}</span>}</div><button onClick={() => addCart(product)} aria-label={`Add ${product.name} to cart`} className="button-primary add-to-cart-button grid size-9 shrink-0 place-items-center rounded-full text-white"><Plus size={18} /></button></div>
+      <div className="mt-3"><span className="product-price font-display text-base font-extrabold text-[#23372b]">{money(product.price)}</span>{product.old_price && <span className="ml-1.5 text-[11px] text-[#9ca69c] line-through">{money(product.old_price)}</span>}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" disabled={!product.stock} onClick={() => addCart(product)} aria-label={`Add ${product.name} to cart`} className="button-primary add-to-cart-button min-h-9 rounded-full px-1.5 text-[9px] font-bold leading-tight text-white disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:text-[10px]">ADD TO CART</button>
+        <button type="button" disabled={!product.stock} onClick={buyNow} className="min-h-9 rounded-full border border-[#dfe7dd] bg-white px-1.5 text-[9px] font-bold leading-tight text-[#456348] hover:bg-[#f1f6ed] disabled:cursor-not-allowed disabled:opacity-50 sm:px-2 sm:text-[10px]">BUY NOW</button>
+      </div>
       {product.stock < 5 && <p className="mt-2 text-[10px] font-semibold text-[#b26d37]">{product.stock === 0 ? "Out of stock" : `Only ${product.stock} left`}</p>}
     </div>
   </article>;
@@ -424,27 +445,46 @@ function SellStoryVisual({ step, playing, onToggle }) {
   </div>;
 }
 
-const PRICE_FILTER_MIN = 500;
-const PRICE_FILTER_MAX = 50000;
-const PRICE_FILTER_STEP = 500;
-
-function PriceRangeFilter({ min, max, onMinChange, onMaxChange, onClear }) {
-  const range = PRICE_FILTER_MAX - PRICE_FILTER_MIN;
-  const left = ((min - PRICE_FILTER_MIN) / range) * 100;
-  const right = 100 - ((max - PRICE_FILTER_MIN) / range) * 100;
-  return <section className="price-range-filter rounded-2xl border border-[#e7ebe4] bg-white p-5">
+function PriceRangeFilter({ min, max, onApply, onClear }) {
+  const [minDraft, setMinDraft] = useState(min);
+  const [maxDraft, setMaxDraft] = useState(max);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setMinDraft(min);
+    setMaxDraft(max);
+    setError("");
+  }, [min, max]);
+  const submit = (event) => {
+    event.preventDefault();
+    const minValue = minDraft.trim();
+    const maxValue = maxDraft.trim();
+    if ([minValue, maxValue].some((value) => value && (!Number.isFinite(Number(value)) || Number(value) < 0))) {
+      setError("Enter valid non-negative prices.");
+      return;
+    }
+    if (minValue && maxValue && Number(minValue) > Number(maxValue)) {
+      setError("Minimum price must not exceed maximum price.");
+      return;
+    }
+    setError("");
+    onApply(minValue, maxValue);
+  };
+  return <form onSubmit={submit} className="rounded-2xl border border-[#e7ebe4] bg-white p-4 sm:p-5">
     <div className="flex items-start justify-between gap-2">
       <div><h2 className="font-display text-sm font-extrabold text-[#304334]">Price Filter</h2><p className="mt-1 text-[11px] text-[#879387]">Choose your price range</p></div>
-      <button type="button" onClick={onClear} className="shrink-0 text-[11px] font-bold text-[#5b8051] underline-offset-2 hover:underline">Clear Filter</button>
+      <button type="button" onClick={() => { setMinDraft(""); setMaxDraft(""); setError(""); onClear(); }} className="shrink-0 text-[11px] font-bold text-[#5b8051] underline-offset-2 hover:underline">Clear Filter</button>
     </div>
-    <p className="mt-5 text-sm font-extrabold text-[#4f8a48]" aria-live="polite">{money(min)} - {money(max)}</p>
-    <div className="price-range-sliders mt-4">
-      <div className="price-range-track"><span style={{ left: `${left}%`, right: `${right}%` }} /></div>
-      <input type="range" min={PRICE_FILTER_MIN} max={PRICE_FILTER_MAX} step={PRICE_FILTER_STEP} value={min} onChange={(event) => onMinChange(Math.min(Number(event.target.value), max - PRICE_FILTER_STEP))} aria-label="Minimum price" />
-      <input type="range" min={PRICE_FILTER_MIN} max={PRICE_FILTER_MAX} step={PRICE_FILTER_STEP} value={max} onChange={(event) => onMaxChange(Math.max(Number(event.target.value), min + PRICE_FILTER_STEP))} aria-label="Maximum price" />
+    <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <label className="text-[11px] font-semibold text-[#667769]">Min Price
+        <input type="number" min="0" step="1" value={minDraft} onChange={(event) => setMinDraft(event.target.value)} placeholder="e.g. 5000" className="mt-1 h-10 w-full rounded-xl border border-[#e8ede6] px-3 text-sm outline-none focus:border-[#9dbb91]" />
+      </label>
+      <label className="text-[11px] font-semibold text-[#667769]">Max Price
+        <input type="number" min="0" step="1" value={maxDraft} onChange={(event) => setMaxDraft(event.target.value)} placeholder="e.g. 20000" className="mt-1 h-10 w-full rounded-xl border border-[#e8ede6] px-3 text-sm outline-none focus:border-[#9dbb91]" />
+      </label>
+      <button type="submit" className="button-primary h-10 rounded-xl px-5 text-sm font-bold uppercase text-white">Filter</button>
     </div>
-    <div className="mt-2 flex justify-between text-[10px] font-semibold text-[#9aa49a]"><span>{money(PRICE_FILTER_MIN)}</span><span>{money(PRICE_FILTER_MAX)}</span></div>
-  </section>;
+    {error && <p role="alert" className="mt-2 text-xs font-semibold text-[#b4463e]">{error}</p>}
+  </form>;
 }
 
 function AnimatedCount({ value }) {
@@ -570,16 +610,18 @@ function Shop() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [productError, setProductError] = useState("");
-  const [priceFilterOpen, setPriceFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({ search: params.get("search") || "", category: params.get("category") || "", brand: "", condition: "", min_price: "", max_price: "", sort: "newest" });
+  const [filters, setFilters] = useState({ search: params.get("search") || "", category: params.get("category") || "", brand: "", condition: "", min_price: params.get("min_price") || "", max_price: params.get("max_price") || "", sort: "newest" });
   useEffect(() => { api.get("/categories/").then(({ data }) => setCategories(data.results || data)).catch((error) => notify(errorMessage(error))); }, [notify]);
   useEffect(() => {
     const category = params.get("category") || "";
+    const minPrice = params.get("min_price") || "";
+    const maxPrice = params.get("max_price") || "";
     setFilters((state) => ({
       ...state,
       search: params.get("search") || "",
       category,
-      ...(category !== state.category ? { min_price: "", max_price: "" } : {}),
+      min_price: category !== state.category ? "" : minPrice,
+      max_price: category !== state.category ? "" : maxPrice,
     }));
   }, [params]);
   const fetchProducts = useCallback(() => {
@@ -595,24 +637,14 @@ function Shop() {
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
   const update = (key, value) => setFilters((state) => ({ ...state, [key]: value }));
   const brands = [...new Set(products.map((product) => product.brand).filter(Boolean))].sort();
-  const selectedMinPrice = filters.min_price === "" ? PRICE_FILTER_MIN : Number(filters.min_price);
-  const selectedMaxPrice = filters.max_price === "" ? PRICE_FILTER_MAX : Number(filters.max_price);
-  const updateMinPrice = (value) => update("min_price", value === PRICE_FILTER_MIN ? "" : String(value));
-  const updateMaxPrice = (value) => update("max_price", value === PRICE_FILTER_MAX ? "" : String(value));
+  const applyPriceFilter = (minPrice, maxPrice) => setFilters((state) => ({ ...state, min_price: minPrice, max_price: maxPrice }));
   const clearPriceFilter = () => setFilters((state) => ({ ...state, min_price: "", max_price: "" }));
   const categoryLabel = categories.find((category) => category.slug.toLowerCase() === filters.category.toLowerCase() || category.name.toLowerCase() === filters.category.toLowerCase())?.name || filters.category;
   const reset = () => { setFilters({ search: "", category: "", brand: "", condition: "", min_price: "", max_price: "", sort: "newest" }); setParams({}); };
   return <main><PageIntro eyebrow="The good finds are here" title="Shop the second life." text="Everything here is inspected, graded and ready for a new home. Find the one that feels right." />
     <div className="mx-auto max-w-[1400px] px-5 py-9 sm:px-10 lg:px-12">
-      <div className="shop-price-mobile mb-4 lg:hidden">
-        <button type="button" onClick={() => setPriceFilterOpen((open) => !open)} aria-expanded={priceFilterOpen} className="flex h-12 w-full items-center justify-between rounded-xl border border-[#e7ebe4] bg-white px-4 text-sm font-bold text-[#405542]">
-          <span>Price Filter <span className="ml-2 text-[#4f8a48]">{money(selectedMinPrice)} - {money(selectedMaxPrice)}</span></span><ChevronDown size={17} className={priceFilterOpen ? "rotate-180 transition-transform" : "transition-transform"} />
-        </button>
-        {priceFilterOpen && <div className="mt-2"><PriceRangeFilter min={selectedMinPrice} max={selectedMaxPrice} onMinChange={updateMinPrice} onMaxChange={updateMaxPrice} onClear={clearPriceFilter} /></div>}
-      </div>
-      <div className="shop-content-layout">
-        <aside className="hidden lg:block"><PriceRangeFilter min={selectedMinPrice} max={selectedMaxPrice} onMinChange={updateMinPrice} onMaxChange={updateMaxPrice} onClear={clearPriceFilter} /></aside>
-        <div className="min-w-0">
+      <PriceRangeFilter min={filters.min_price} max={filters.max_price} onApply={applyPriceFilter} onClear={clearPriceFilter} />
+      <div className="mt-5">
           <div className="mb-7 grid gap-3 rounded-2xl border border-[#e7ebe4] bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
             <label className="relative sm:col-span-2 lg:col-span-2"><Search size={16} className="absolute left-3 top-3.5 text-[#93a093]" /><input value={filters.search} onChange={(e) => update("search", e.target.value)} placeholder="Search by name or brand" className="h-11 w-full rounded-xl border border-[#e8ede6] pl-9 pr-3 text-sm outline-none focus:border-[#9dbb91]" /></label>
             <select value={filters.category} onChange={(e) => update("category", e.target.value)} className="h-11 rounded-xl border border-[#e8ede6] bg-white px-3 text-sm text-[#536156]"><option value="">All categories</option>{categories.filter((c) => c.slug !== "exchange-zone").map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select>
@@ -625,7 +657,6 @@ function Shop() {
           {!loading && productError ? <div role="alert" className="rounded-3xl border border-dashed border-[#d7e0d4] bg-white py-16 text-center text-sm text-[#758276]">{productError}</div>
             : !loading && !products.length && filters.category ? <div className="rounded-3xl border border-dashed border-[#d7e0d4] bg-white py-16 text-center"><h2 className="font-display text-lg font-extrabold text-[#344737]">Coming Soon - No products in {categoryLabel} yet</h2><p className="mt-2 text-sm text-[#758276]">We’re getting this collection ready for you.</p><Link to="/shop" className="button-primary mt-5 inline-flex rounded-full px-5 py-3 text-xs font-bold text-white">View All Products</Link></div>
               : <ProductGrid products={products} loading={loading} />}
-        </div>
       </div>
     </div>
   </main>;
