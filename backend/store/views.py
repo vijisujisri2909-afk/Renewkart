@@ -23,6 +23,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.reverse import reverse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -56,6 +57,59 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def api_root(request):
+    return Response({
+        "auth": {
+            "register": reverse("register", request=request),
+            "login": reverse("login", request=request),
+            "logout": reverse("logout", request=request),
+            "forgot_password": reverse("forgot-password", request=request),
+            "reset_password": reverse("reset-password", request=request),
+        },
+        "profile": reverse("profile", request=request),
+        "categories": reverse("categories", request=request),
+        "products": {
+            "list": reverse("products", request=request),
+            "detail_pattern": "/api/products/<slug>/",
+            "reviews_pattern": "/api/products/<product_id>/reviews/",
+        },
+        "featured_reviews": reverse("featured-reviews", request=request),
+        "cart": reverse("cart", request=request),
+        "wishlist": reverse("wishlist", request=request),
+        "addresses": {
+            "list": reverse("address-list", request=request),
+            "detail_pattern": "/api/addresses/<id>/",
+        },
+        "coupons": {
+            "check": reverse("coupon-check", request=request),
+            "admin": reverse("admin-coupon-list", request=request),
+        },
+        "orders": {
+            "list": reverse("orders", request=request),
+            "detail_pattern": "/api/orders/<order_number>/",
+        },
+        "payments": {
+            "razorpay_create": reverse("razorpay-create", request=request),
+            "razorpay_verify": reverse("razorpay-verify", request=request),
+        },
+        "exchange_estimate": reverse("exchange-estimate", request=request),
+        "contact": reverse("contact", request=request),
+        "admin": {
+            "stats": reverse("admin-stats", request=request),
+            "products": reverse("admin-product-list", request=request),
+            "product_detail_pattern": "/api/admin/products/<id>/",
+            "categories": reverse("admin-category-list", request=request),
+            "category_detail_pattern": "/api/admin/categories/<id>/",
+            "orders": reverse("admin-order-list", request=request),
+            "order_detail_pattern": "/api/admin/orders/<order_number>/",
+            "coupons": reverse("admin-coupon-list", request=request),
+            "users": reverse("admin-user-list", request=request),
+        },
+    })
 
 
 def _razorpay_client():

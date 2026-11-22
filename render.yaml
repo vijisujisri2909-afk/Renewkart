@@ -4,8 +4,10 @@ services:
     runtime: python
     rootDir: backend
     plan: starter
+    region: singapore
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate --noinput && python manage.py seed_store && python manage.py ensure_deploy_admin && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/products/
     disk:
       name: renewkart-data
       mountPath: /var/data
@@ -13,14 +15,24 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings
       - key: DJANGO_DEBUG
         value: "0"
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_ALLOWED_HOSTS
         value: renewkart-api.onrender.com
-      - key: DATABASE_PATH
-        value: /var/data/db.sqlite3
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: renewkart-db
+          property: connectionString
       - key: MEDIA_ROOT
         value: /var/data/media
       - key: CORS_ALLOWED_ORIGINS
@@ -60,3 +72,10 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://renewkart-api.onrender.com/api
+
+databases:
+  - name: renewkart-db
+    databaseName: renewkart
+    user: renewkart
+    plan: free
+    region: singapore

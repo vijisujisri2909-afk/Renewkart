@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -41,6 +42,62 @@ class StoreFlowTests(APITestCase):
             password="StrongPass#2026",
         )
         self.client.force_authenticate(self.user)
+
+    def test_api_root_lists_public_and_admin_endpoints(self):
+        response = self.client.get("/api/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["products"]["list"].endswith("/api/products/"))
+        self.assertTrue(response.data["categories"].endswith("/api/categories/"))
+        self.assertTrue(response.data["orders"]["list"].endswith("/api/orders/"))
+        self.assertTrue(response.data["addresses"]["list"].endswith("/api/addresses/"))
+        self.assertTrue(response.data["admin"]["products"].endswith("/api/admin/products/"))
+        self.assertTrue(response.data["admin"]["categories"].endswith("/api/admin/categories/"))
+        self.assertTrue(response.data["admin"]["orders"].endswith("/api/admin/orders/"))
+
+    def test_public_product_and_category_routes_and_append_slash(self):
+        call_command("seed_store")
+
+        products = self.client.get("/api/products/")
+        categories = self.client.get("/api/categories/")
+        slash_redirect = self.client.get("/api/products", follow=False)
+
+        self.assertEqual(products.status_code, 200)
+        self.assertEqual(products.data["count"], 48)
+        self.assertEqual(categories.status_code, 200)
+        self.assertEqual(categories.data["count"], 7)
+        self.assertEqual(slash_redirect.status_code, 301)
+        self.assertEqual(slash_redirect["Location"], "/api/products/")
+
+    def test_deploy_admin_command_is_idempotent_without_rotating_existing_password(self):
+        values = {
+            "DJANGO_SUPERUSER_USERNAME": "deploy-admin",
+            "DJANGO_SUPERUSER_EMAIL": "deploy-admin@example.com",
+            "DJANGO_SUPERUSER_PASSWORD": "r7#Qm2!zL9@vC4$w",
+        }
+        original_password = values["DJANGO_SUPERUSER_PASSWORD"]
+        with patch.dict("os.environ", values):
+            call_command("ensure_deploy_admin")
+            user = User.objects.get(username="deploy-admin")
+            self.assertTrue(user.is_staff)
+            self.assertTrue(user.is_superuser)
+            self.assertTrue(user.check_password(original_password))
+
+            values["DJANGO_SUPERUSER_PASSWORD"] = "s8%Jk4!pV2^xN6&b"
+            call_command("ensure_deploy_admin")
+            user.refresh_from_db()
+            self.assertTrue(user.check_password(original_password))
+
+    def test_deploy_admin_command_skips_when_render_credentials_are_unset(self):
+        names = {
+            "DJANGO_SUPERUSER_USERNAME": "",
+            "DJANGO_SUPERUSER_EMAIL": "",
+            "DJANGO_SUPERUSER_PASSWORD": "",
+        }
+        with patch.dict("os.environ", names):
+            call_command("ensure_deploy_admin")
+
+        self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
 
     def test_seed_command_creates_catalogue_products_with_seven_categories_and_unique_images(self):
         call_command("seed_store")

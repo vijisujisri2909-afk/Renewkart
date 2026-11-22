@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -29,6 +29,7 @@ from .views import (
     RegisterView,
     ReviewListCreateView,
     WishlistView,
+    api_root,
     admin_stats,
 )
 
@@ -41,6 +42,7 @@ router.register("admin/coupons", AdminCouponViewSet, basename="admin-coupon")
 router.register("admin/users", AdminUserViewSet, basename="admin-user")
 
 urlpatterns = [
+    re_path(r"^$", api_root, name="store-api-root"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/token/", obtain_auth_token, name="token"),
