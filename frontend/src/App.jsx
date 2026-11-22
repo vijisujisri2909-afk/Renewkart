@@ -12,6 +12,8 @@ import api, { errorMessage } from "./api";
 const StoreContext = createContext(null);
 const useStore = () => useContext(StoreContext);
 const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+const storeAddress = "Chennai, Tamil Nadu, India";
+const storeMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress)}`;
 const imageFallback = "/images/banners/book-fallback.jpg";
 const productImageFallback = "/images/products/apple-iphone-13.jpg";
 const conditionText = { like_new: "Like New", good: "Good", average: "Average" };
@@ -246,6 +248,7 @@ function Header() {
         </form>
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0 lg:gap-2">
           <Link to="/wishlist" className="header-action relative grid size-10 place-items-center rounded-full text-[#45574b] hover:bg-[#edf2e9]" aria-label="Wishlist"><Heart size={19} />{wish.length > 0 && <span className="header-count absolute right-0 top-0 grid size-[17px] place-items-center rounded-full bg-[#679353] text-[10px] font-bold text-white">{wish.length}</span>}</Link>
+          <a href={storeMapsUrl} target="_blank" rel="noreferrer" aria-label="Open ReNewKart location in Google Maps" title="Chennai, Tamil Nadu, India" className="header-action flex h-10 w-10 shrink-0 items-center justify-center gap-1 rounded-full text-[#45574b] hover:bg-[#edf2e9] sm:w-auto sm:px-3"><span aria-hidden="true">📍</span><span className="hidden text-[11px] font-semibold sm:inline">Chennai</span></a>
           <Link to="/cart" className="header-action relative grid size-10 place-items-center rounded-full text-[#45574b] hover:bg-[#edf2e9]" aria-label="Cart"><ShoppingCart size={19} />{cart.length > 0 && <span className="header-count absolute right-0 top-0 grid size-[17px] place-items-center rounded-full bg-[#679353] text-[10px] font-bold text-white">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>}</Link>
           {user ? <Link to={user.is_staff ? "/admin" : "/profile"} className="hidden h-10 items-center gap-2 rounded-full bg-[#e5efdf] px-3 text-xs font-bold text-[#3c6740] sm:flex"><UserRound size={15} />{user.first_name || "Account"}</Link> : <Link to="/login" className="button-primary hidden h-10 items-center rounded-full px-4 text-xs font-bold text-white sm:flex">Sign in</Link>}
         </div>
@@ -355,7 +358,7 @@ function Footer() {
         </div>
         <div><p className="mb-4 text-sm font-bold">Explore</p><FooterLink to="/shop">Shop all</FooterLink><FooterLink to="/about">Our story</FooterLink><FooterLink to="/exchange">Sell / exchange</FooterLink><FooterLink to="/orders">Track an order</FooterLink></div>
         <div><p className="mb-4 text-sm font-bold">Help & support</p><FooterLink to="/contact">Contact us</FooterLink><FooterLink to="/faq">FAQs</FooterLink><FooterLink to="/warranty">Warranty & returns</FooterLink><FooterLink to="/profile">My account</FooterLink></div>
-        <div><p className="mb-4 text-sm font-bold">Say hello</p><a href="mailto:hello@renewkart.in" className="flex items-center gap-2 text-sm text-[#bdc9be] hover:text-white"><Mail size={15} /> hello@renewkart.in</a><p className="mt-3 text-sm text-[#bdc9be]">Mon–Sat, 9am–6pm IST</p><div className="mt-6 flex items-start gap-2 text-xs leading-5 text-[#9faf9f]"><Leaf size={16} className="mt-0.5 shrink-0 text-[#a2c493]" />Every second life is a little kinder to the planet.</div></div>
+        <div><p className="mb-4 text-sm font-bold">Say hello</p><a href="mailto:hello@renewkart.in" className="flex items-center gap-2 text-sm text-[#bdc9be] hover:text-white"><Mail size={15} /> hello@renewkart.in</a><p className="mt-3 text-sm text-[#bdc9be]">Mon–Sat, 9am–6pm IST</p><section className="mt-5 border-t border-white/10 pt-4"><h2 className="text-sm font-bold">Our Location</h2><p className="mt-2 text-sm text-[#bdc9be]">{storeAddress}</p><a href={storeMapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-[#c6dfb9] underline-offset-2 hover:underline"><MapPin size={15} />View on Google Maps</a></section><div className="mt-6 flex items-start gap-2 text-xs leading-5 text-[#9faf9f]"><Leaf size={16} className="mt-0.5 shrink-0 text-[#a2c493]" />Every second life is a little kinder to the planet.</div></div>
       </div>
       <div className="border-t border-white/10 px-5 py-4 text-center text-xs text-[#9faf9f]">© {new Date().getFullYear()} ReNewKart. Better stuff, less waste.</div>
     </footer>
