@@ -36,7 +36,7 @@ services:
       - key: MEDIA_ROOT
         value: /var/data/media
       - key: CORS_ALLOWED_ORIGINS
-        value: https://renewkart-web.onrender.com
+        value: https://renewkart-web.onrender.com,https://renewkart.vercel.app
       - key: CSRF_TRUSTED_ORIGINS
         value: https://renewkart-api.onrender.com,https://renewkart-web.onrender.com
       - key: FRONTEND_URL

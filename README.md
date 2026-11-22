@@ -91,6 +91,12 @@ The root `render.yaml` defines a Django API service, a Vite static site and a Po
 5. Enter Razorpay **Test Mode** keys if online checkout should be enabled. Without those keys, the API keeps Cash on Delivery available and returns an explicit configuration error for Razorpay.
 6. Confirm the API responds at `https://renewkart-api.onrender.com/api/products/` and `https://renewkart-api.onrender.com/api/categories/`, then open the frontend at `https://renewkart-web.onrender.com`. If you change either service's Render domain, update `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`, and `VITE_API_URL` to match.
 
+## Deploy the frontend to Vercel
+
+Create a Vercel project for this repository with `frontend` as its Root Directory, `npm run build` as its Build Command, and `dist` as its Output Directory. Set the build-time environment variable `VITE_API_URL` to `https://renewkart-api.onrender.com/api` for Production (and Preview if previews should use the live API). Vite bundles this value into the frontend at build time.
+
+The Render Blueprint includes `https://renewkart.vercel.app` in `CORS_ALLOWED_ORIGINS`; Django also allows HTTPS `*.vercel.app` origins and the local Vite origin without enabling CORS for all origins. If you have overridden `CORS_ALLOWED_ORIGIN_REGEXES` in your deployment, ensure it retains the Vercel rule. Product requests use `/products/` relative to `VITE_API_URL`, resulting in `https://renewkart-api.onrender.com/api/products/`.
+
 Set production secrets in Render's environment settings, not in `.env` files or source control. To refresh the deployment catalogue from the local SQLite database, run `python manage.py export_catalogue_snapshot` from `backend/` and commit the generated snapshot. The Blueprint uses Render's free PostgreSQL plan, which expires after its free-plan retention period; choose a paid plan in Render for persistent production data.
 
 ## Useful API routes

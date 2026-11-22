@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: import.meta.env.VITE_API_URL || "https://renewkart-api.onrender.com/api",
 });
 
 api.interceptors.request.use((config) => {
@@ -12,7 +12,7 @@ api.interceptors.request.use((config) => {
 
 export const errorMessage = (error) => {
   if (!error?.response && (error?.code === "ERR_NETWORK" || error?.message === "Network Error")) {
-    return "Backend is not running, please restart";
+    return "Could not reach the API. Check the API URL, backend CORS settings, or network connection.";
   }
   const data = error?.response?.data;
   if (typeof data?.detail === "string") return data.detail;

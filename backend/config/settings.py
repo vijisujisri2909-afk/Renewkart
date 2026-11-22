@@ -120,7 +120,8 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "hello@renewkart.local")
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+        "CORS_ALLOWED_ORIGINS",
+        "https://renewkart.vercel.app,http://localhost:5173,http://127.0.0.1:5173",
     ).split(",")
     if origin.strip()
 ]
@@ -136,6 +137,7 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://localhost(:\d+)?$",
     r"^https?://127\.0\.0\.1(:\d+)?$",
+    r"^https://([a-z0-9-]+\.)*vercel\.app$",
 ]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
