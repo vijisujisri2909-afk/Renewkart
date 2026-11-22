@@ -192,10 +192,31 @@ function Header() {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchTimeout = useRef(null);
+  useEffect(() => {
+    setSearch(new URLSearchParams(location.search).get("search") || "");
+  }, [location.search]);
+  useEffect(() => () => {
+    if (searchTimeout.current !== null) window.clearTimeout(searchTimeout.current);
+  }, []);
+  const navigateToSearch = (value) => {
+    const query = value.trim();
+    navigate(query ? `/shop?search=${encodeURIComponent(query)}` : "/shop");
+    setOpen(false);
+  };
+  const updateSearch = (value) => {
+    setSearch(value);
+    if (searchTimeout.current !== null) window.clearTimeout(searchTimeout.current);
+    searchTimeout.current = window.setTimeout(() => navigateToSearch(value), 300);
+  };
   const submit = (event) => {
     event.preventDefault();
-    navigate(`/shop?search=${encodeURIComponent(search)}`);
-    setOpen(false);
+    if (searchTimeout.current !== null) {
+      window.clearTimeout(searchTimeout.current);
+      searchTimeout.current = null;
+    }
+    navigateToSearch(search);
   };
   return (
     <header className="sticky top-0 z-50 border-b border-[#e7ebe4] bg-[#f7f8f5]/95 shadow-sm backdrop-blur-md">
@@ -220,7 +241,7 @@ function Header() {
         </nav>
         <form onSubmit={submit} className="header-search ml-auto hidden h-10 max-w-[270px] flex-1 items-center gap-2 rounded-full border border-[#e2e8de] bg-white px-4 lg:flex">
           <Search size={16} className="shrink-0 text-[#87958a]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search mobiles, books..." className="w-full bg-transparent text-xs outline-none placeholder:text-[#97a198]" aria-label="Search products" />
+          <input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search mobiles, books..." className="w-full bg-transparent text-xs outline-none placeholder:text-[#97a198]" aria-label="Search products" />
           <button className="sr-only">Search</button>
         </form>
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0 lg:gap-2">
@@ -230,7 +251,7 @@ function Header() {
         </div>
       </div>
       {open && <div className="border-t border-[#e7ebe4] bg-[#f7f8f5] px-5 py-4 md:hidden">
-        <form onSubmit={submit} className="mb-3 flex h-11 items-center gap-2 rounded-xl border border-[#e2e8de] bg-white px-3"><Search size={17} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products" className="w-full bg-transparent text-sm outline-none" /></form>
+        <form onSubmit={submit} className="mb-3 flex h-11 items-center gap-2 rounded-xl border border-[#e2e8de] bg-white px-3"><Search size={17} /><input value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search products" className="w-full bg-transparent text-sm outline-none" /></form>
         {[["Home", "/"], ["Shop all", "/shop"], ...productCategoryLinks.map(([label, slug]) => [label, `/shop?category=${slug}`]), ["Exchange zone", "/exchange"], ["About us", "/about"]].map(([label, url]) => <Link key={label} to={url} onClick={() => setOpen(false)} className="block border-b border-[#e9ede6] py-3 text-sm font-medium">{label}</Link>)}
         {user ? <Link to="/profile" onClick={() => setOpen(false)} className="block py-3 text-sm font-medium">My account</Link> : <Link to="/login" onClick={() => setOpen(false)} className="block py-3 text-sm font-medium">Sign in / Sign up</Link>}
       </div>}
@@ -610,20 +631,30 @@ function Shop() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [productError, setProductError] = useState("");
+  const [searchDraft, setSearchDraft] = useState(params.get("search") || "");
   const [filters, setFilters] = useState({ search: params.get("search") || "", category: params.get("category") || "", brand: "", condition: "", min_price: params.get("min_price") || "", max_price: params.get("max_price") || "", sort: "newest" });
   useEffect(() => { api.get("/categories/").then(({ data }) => setCategories(data.results || data)).catch((error) => notify(errorMessage(error))); }, [notify]);
   useEffect(() => {
     const category = params.get("category") || "";
     const minPrice = params.get("min_price") || "";
     const maxPrice = params.get("max_price") || "";
+    const search = params.get("search") || "";
+    setSearchDraft(search);
     setFilters((state) => ({
       ...state,
-      search: params.get("search") || "",
+      search,
       category,
       min_price: category !== state.category ? "" : minPrice,
       max_price: category !== state.category ? "" : maxPrice,
     }));
   }, [params]);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const search = searchDraft.trim();
+      setFilters((state) => state.search === search ? state : { ...state, search });
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchDraft]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -640,17 +671,24 @@ function Shop() {
     return () => controller.abort();
   }, [filters, notify]);
   const update = (key, value) => setFilters((state) => ({ ...state, [key]: value }));
+  const submitSearch = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const search = searchDraft.trim();
+      setFilters((state) => state.search === search ? state : { ...state, search });
+    }
+  };
   const brands = [...new Set(products.map((product) => product.brand).filter(Boolean))].sort();
   const applyPriceFilter = (minPrice, maxPrice) => setFilters((state) => ({ ...state, min_price: minPrice, max_price: maxPrice }));
   const clearPriceFilter = () => setFilters((state) => ({ ...state, min_price: "", max_price: "" }));
   const categoryLabel = categories.find((category) => category.slug.toLowerCase() === filters.category.toLowerCase() || category.name.toLowerCase() === filters.category.toLowerCase())?.name || filters.category;
-  const reset = () => { setFilters({ search: "", category: "", brand: "", condition: "", min_price: "", max_price: "", sort: "newest" }); setParams({}); };
+  const reset = () => { setSearchDraft(""); setFilters({ search: "", category: "", brand: "", condition: "", min_price: "", max_price: "", sort: "newest" }); setParams({}); };
   return <main><PageIntro eyebrow="The good finds are here" title="Shop the second life." text="Everything here is inspected, graded and ready for a new home. Find the one that feels right." />
     <div className="mx-auto max-w-[1400px] px-5 py-9 sm:px-10 lg:px-12">
       <PriceRangeFilter min={filters.min_price} max={filters.max_price} onApply={applyPriceFilter} onClear={clearPriceFilter} />
       <div className="mt-5">
           <div className="mb-7 grid gap-3 rounded-2xl border border-[#e7ebe4] bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
-            <label className="relative sm:col-span-2 lg:col-span-2"><Search size={16} className="absolute left-3 top-3.5 text-[#93a093]" /><input value={filters.search} onChange={(e) => update("search", e.target.value)} placeholder="Search by name or brand" className="h-11 w-full rounded-xl border border-[#e8ede6] pl-9 pr-3 text-sm outline-none focus:border-[#9dbb91]" /></label>
+            <label className="relative sm:col-span-2 lg:col-span-2"><Search size={16} className="absolute left-3 top-3.5 text-[#93a093]" /><input value={searchDraft} onChange={(e) => setSearchDraft(e.target.value)} onKeyDown={submitSearch} placeholder="Search by name, brand, or category" className="h-11 w-full rounded-xl border border-[#e8ede6] pl-9 pr-3 text-sm outline-none focus:border-[#9dbb91]" /></label>
             <select value={filters.category} onChange={(e) => update("category", e.target.value)} className="h-11 rounded-xl border border-[#e8ede6] bg-white px-3 text-sm text-[#536156]"><option value="">All categories</option>{categories.filter((c) => c.slug !== "exchange-zone").map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select>
             <select value={filters.condition} onChange={(e) => update("condition", e.target.value)} className="h-11 rounded-xl border border-[#e8ede6] bg-white px-3 text-sm text-[#536156]"><option value="">Any condition</option><option value="like_new">Like New</option><option value="good">Good</option><option value="average">Average</option></select>
             <select value={filters.brand} onChange={(e) => update("brand", e.target.value)} className="h-11 rounded-xl border border-[#e8ede6] bg-white px-3 text-sm text-[#536156]"><option value="">Any brand</option>{brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}</select>
@@ -659,7 +697,8 @@ function Shop() {
           </div>
           <p className="mb-4 text-xs text-[#889488]">{loading ? "Finding good things..." : `${products.length} find${products.length === 1 ? "" : "s"} for you`}</p>
           {!loading && productError ? <div role="alert" className="rounded-3xl border border-dashed border-[#d7e0d4] bg-white py-16 text-center text-sm text-[#758276]">{productError}</div>
-            : !loading && !products.length && filters.category ? <div className="rounded-3xl border border-dashed border-[#d7e0d4] bg-white py-16 text-center"><h2 className="font-display text-lg font-extrabold text-[#344737]">Coming Soon - No products in {categoryLabel} yet</h2><p className="mt-2 text-sm text-[#758276]">We’re getting this collection ready for you.</p><Link to="/shop" className="button-primary mt-5 inline-flex rounded-full px-5 py-3 text-xs font-bold text-white">View All Products</Link></div>
+            : !loading && !products.length && filters.search ? <ProductGrid products={products} loading={loading} empty={`No products found for '${filters.search}'.`} />
+              : !loading && !products.length && filters.category ? <div className="rounded-3xl border border-dashed border-[#d7e0d4] bg-white py-16 text-center"><h2 className="font-display text-lg font-extrabold text-[#344737]">Coming Soon - No products in {categoryLabel} yet</h2><p className="mt-2 text-sm text-[#758276]">We’re getting this collection ready for you.</p><Link to="/shop" className="button-primary mt-5 inline-flex rounded-full px-5 py-3 text-xs font-bold text-white">View All Products</Link></div>
               : <ProductGrid products={products} loading={loading} />}
       </div>
     </div>
