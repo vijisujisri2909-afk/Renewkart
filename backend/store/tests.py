@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -137,6 +138,20 @@ class StoreFlowTests(APITestCase):
         response = self.client.get("/api/products/")
         self.assertEqual(response.data["count"], 47)
         self.assertEqual(len(response.data["results"]), 47)
+
+    def test_catalogue_snapshot_loads_local_records_idempotently(self):
+        call_command("seed_catalogue_snapshot")
+        call_command("seed_catalogue_snapshot")
+
+        self.assertEqual(Category.objects.count(), 7)
+        self.assertEqual(Product.objects.count(), 48)
+        snapshot_path = Path(__file__).parent / "data" / "catalogue.json"
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        expected = next(row for row in snapshot["products"] if row["slug"] == "apple-iphone-13")
+        imported = Product.objects.get(slug="apple-iphone-13")
+        self.assertTrue(imported.is_active)
+        self.assertEqual(imported.stock, expected["stock"])
+        self.assertEqual(str(imported.price), expected["price"])
 
     def test_price_range_filter_returns_only_matching_products(self):
         call_command("seed_store")

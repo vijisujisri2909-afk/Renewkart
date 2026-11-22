@@ -84,14 +84,14 @@ Create the first staff account using `createsuperuser`. Only staff accounts can 
 
 The root `render.yaml` defines a Django API service, a Vite static site and a PostgreSQL database. Connect the repository in Render as a Blueprint and review all three resources before deploying.
 
-1. The API service installs dependencies and collects static files during build. At startup it migrates PostgreSQL, idempotently seeds the catalogue, and provisions the administrator if its environment variables are set.
+1. The API service installs dependencies and collects static files during build. At startup it migrates PostgreSQL, idempotently loads the checked-in `backend/store/data/catalogue.json` snapshot exported from the local database, and provisions the administrator if its environment variables are set.
 2. PostgreSQL uses Render's internal connection URL. The persistent disk mounted at `/var/data` stores uploaded media only.
 3. Set `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL`, and a unique, strong `DJANGO_SUPERUSER_PASSWORD` in Render. The password is not stored in `render.yaml`; an existing account's password is not reset on each restart.
 4. Enter SMTP credentials when prompted. Password reset uses SMTP when `DJANGO_DEBUG=0`; production startup intentionally fails if `EMAIL_HOST` is missing.
 5. Enter Razorpay **Test Mode** keys if online checkout should be enabled. Without those keys, the API keeps Cash on Delivery available and returns an explicit configuration error for Razorpay.
 6. Confirm the API responds at `https://renewkart-api.onrender.com/api/products/` and `https://renewkart-api.onrender.com/api/categories/`, then open the frontend at `https://renewkart-web.onrender.com`. If you change either service's Render domain, update `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `FRONTEND_URL`, and `VITE_API_URL` to match.
 
-Set production secrets in Render's environment settings, not in `.env` files or source control. The Blueprint uses Render's free PostgreSQL plan, which expires after its free-plan retention period; choose a paid plan in Render for persistent production data.
+Set production secrets in Render's environment settings, not in `.env` files or source control. To refresh the deployment catalogue from the local SQLite database, run `python manage.py export_catalogue_snapshot` from `backend/` and commit the generated snapshot. The Blueprint uses Render's free PostgreSQL plan, which expires after its free-plan retention period; choose a paid plan in Render for persistent production data.
 
 ## Useful API routes
 
