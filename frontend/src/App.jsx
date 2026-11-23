@@ -794,12 +794,27 @@ function ProductPage() {
   </main>;
 }
 
+function CouponBox({ code, setCode, onApply, busy, applied, error, subtotal }) {
+  const discount = applied ? Math.min(Number(applied.discount_amount) || subtotal * Number(applied.discount_percent) / 100, subtotal) : 0;
+  return <div className="coupon-box mt-5 rounded-2xl border-2 border-[#dbe8d7] bg-[#f8fbf6] p-4">
+    <label className="block text-xs font-extrabold uppercase tracking-[.12em] text-[#48664b]">Coupon Code</label>
+    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+      <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="Enter Coupon Code" aria-label="Enter Coupon Code" className="h-12 min-w-0 flex-1 rounded-xl border-2 border-[#cbdcc7] bg-white px-4 text-sm font-semibold uppercase outline-none focus:border-[#5b8b54]" />
+      <button type="button" onClick={onApply} disabled={busy || !code.trim()} className="h-12 rounded-xl bg-[#3f7b4a] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#32663b] disabled:cursor-not-allowed disabled:opacity-60">{busy ? "Applying..." : "Apply"}</button>
+    </div>
+    <p className="mt-2 text-[11px] text-[#6e806f]">Try: RENEW10 for 10% OFF</p>
+    {applied && <p className="mt-2 text-sm font-bold text-[#3f7b4a]">Coupon Applied! You saved {money(discount)}</p>}
+    {error && <p className="mt-2 text-sm font-bold text-[#b34d45]">Invalid Coupon</p>}
+  </div>;
+}
+
 function CartPage() {
   const { cart, refreshCounts, notify } = useStore();
   const [coupon, setCoupon] = useState("");
   const [applied, setApplied] = useState(() => {
     try { return JSON.parse(localStorage.getItem("renewkart_coupon") || "null"); } catch { return null; }
   });
+  const [couponError, setCouponError] = useState(false);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const subtotal = cart.reduce((sum, item) => sum + Number(item.line_total), 0);
@@ -818,11 +833,13 @@ function CartPage() {
     try {
       const { data } = await api.post("/coupons/check/", { code: coupon.trim().toUpperCase() });
       setApplied(data);
+      setCouponError(false);
       localStorage.setItem("renewkart_coupon", JSON.stringify(data));
       const saved = Math.min(Number(data.discount_amount) || subtotal * Number(data.discount_percent) / 100, subtotal);
       notify(`Coupon Applied! You saved ${money(saved)}`, "success");
     } catch (error) {
       setApplied(null);
+      setCouponError(true);
       localStorage.removeItem("renewkart_coupon");
       notify("Invalid Coupon", "error");
     }
@@ -854,12 +871,29 @@ function Checkout() {
   const couponCode = searchParams.get("coupon") || location.state?.couponCode || (() => {
     try { return JSON.parse(localStorage.getItem("renewkart_coupon") || "null")?.code || ""; } catch { return ""; }
   })();
+  const [couponCodeInput, setCouponCodeInput] = useState(couponCode);
+  const [couponError, setCouponError] = useState(false);
   const [coupon, setCoupon] = useState(null);
   useEffect(() => {
     if (!user || !couponCode) { setCoupon(null); return; }
     api.post("/coupons/check/", { code: couponCode }).then(({ data }) => setCoupon(data)).catch((error) => { setCoupon(null); notify(errorMessage(error)); });
   }, [couponCode, notify, user]);
   const discount = coupon ? Math.min(Number(coupon.discount_amount) || subtotal * Number(coupon.discount_percent) / 100, subtotal) : 0;
+  const applyCheckoutCoupon = async () => {
+    try {
+      const { data } = await api.post("/coupons/check/", { code: couponCodeInput.trim().toUpperCase() });
+      setCoupon(data);
+      setCouponError(false);
+      setCouponCodeInput(data.code);
+      localStorage.setItem("renewkart_coupon", JSON.stringify(data));
+      notify(`Coupon Applied! You saved ${money(Math.min(Number(data.discount_amount) || subtotal * data.discount_percent / 100, subtotal))}`, "success");
+    } catch (error) {
+      setCoupon(null);
+      setCouponError(true);
+      localStorage.removeItem("renewkart_coupon");
+      notify("Invalid Coupon", "error");
+    }
+  };
   useEffect(() => {
     if (!user) return;
     api.get("/addresses/").then(({ data }) => {
@@ -884,12 +918,12 @@ function Checkout() {
         setShowForm(false);
       }
       if (payment === "cod") {
-        const { data } = await api.post("/orders/", { address_id: Number(addressId), payment_method: "cod", coupon_code: couponCode });
+        const { data } = await api.post("/orders/", { address_id: Number(addressId), payment_method: "cod", coupon_code: coupon?.code || couponCodeInput });
         await refreshCounts();
         navigate(`/orders/${data.order_number}`, { state: { justPlaced: true } });
       } else {
         await loadRazorpay();
-        const { data } = await api.post("/payments/razorpay/create/", { address_id: Number(addressId), coupon_code: couponCode });
+          const { data } = await api.post("/payments/razorpay/create/", { address_id: Number(addressId), payment_method: "razorpay", coupon_code: coupon?.code || couponCodeInput });
         const checkout = new window.Razorpay({
           key: data.key_id,
           amount: data.amount,
@@ -926,6 +960,7 @@ function Checkout() {
           {addresses.length > 0 && <button type="button" onClick={() => setShowForm(!showForm)} className="mt-4 text-xs font-bold text-[#5a8050]">{showForm ? "Use a saved address" : "+ Add a new address"}</button>}
         </section>
         <section className="rounded-[22px] border border-[#e8ede5] bg-white p-5 sm:p-6"><p className="text-[10px] font-extrabold uppercase tracking-[.16em] text-[#7d9674]">Step 02</p><h2 className="mt-1 font-display text-lg font-extrabold text-[#304334]">Payment method</h2><div className="mt-4 grid gap-3 sm:grid-cols-2">{[["cod", "Cash on Delivery", "Pay when your order arrives", Truck], ["razorpay", "Razorpay", "UPI, cards & net banking", LockKeyhole]].map(([key,title,desc,Icon]) => <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${payment === key ? "border-[#8faf7f] bg-[#f4f8f1]" : "border-[#e9ede7]"}`}><input type="radio" name="payment" value={key} checked={payment === key} onChange={() => setPayment(key)} className="mt-1 accent-[#50754a]" /><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e8f0e3] text-[#5b8051]"><Icon size={17} /></span><span><b className="text-xs text-[#354738]">{title}</b><span className="mt-1 block text-[10px] text-[#89958a]">{desc}</span></span></label>)}</div></section>
+        <CouponBox code={couponCodeInput} setCode={setCouponCodeInput} onApply={applyCheckoutCoupon} busy={busy} applied={coupon} error={couponError} subtotal={subtotal} />
       </div>
       <aside className="h-fit rounded-[22px] border border-[#e8ede5] bg-white p-5 sm:p-6"><h2 className="font-display text-lg font-extrabold text-[#304334]">Your order</h2><div className="mt-4 max-h-64 space-y-3 overflow-auto">{cart.map((item) => <div key={item.id} className="flex items-center gap-3"><img src={localProductImage(item.product)} alt="" className="size-12 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[#405143]">{item.product.name}</p><p className="text-[10px] text-[#8b978c]">Qty {item.quantity}</p></div><b className="text-xs text-[#405143]">{money(item.line_total)}</b></div>)}</div><div className="mt-4 space-y-3 border-t border-[#edf0eb] pt-4 text-sm"><div className="flex justify-between text-[#758176]"><span>Subtotal</span><span>{money(subtotal)}</span></div>{coupon && <div className="flex justify-between text-[#56804b]"><span>Coupon · {coupon.code} ({coupon.discount_percent}%)</span><span>−{money(discount)}</span></div>}<div className="flex justify-between text-[#758176]"><span>Delivery</span><span className="font-bold text-[#56804b]">Free</span></div><div className="flex justify-between border-t border-[#edf0eb] pt-4 font-extrabold text-[#304334]"><span>Total</span><span>{money(subtotal - discount)}</span></div></div><button disabled={busy || !cart.length} className="button-primary mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white disabled:opacity-50">{busy ? "Placing order..." : payment === "cod" ? "Place order" : "Continue to payment"}<ArrowRight size={16} /></button><p className="mt-3 text-center text-[10px] text-[#94a095]">Your information is encrypted and secure.</p></aside>
     </form>

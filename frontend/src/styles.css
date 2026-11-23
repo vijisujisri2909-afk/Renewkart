@@ -15,6 +15,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 img { display: block; }
 .font-display, h1, h2, h3, h4, h5, h6, button, .button-primary { font-family: "Dancing Script", cursive; }
+.coupon-box { width: 100%; }
+aside > form:has(input[placeholder="Coupon code"]) { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding: 16px; border: 2px solid #dbe8d7; border-radius: 16px; background: #f8fbf6; }
+aside > form:has(input[placeholder="Coupon code"])::after { flex-basis: 100%; color: #6e806f; content: "Try: RENEW10 for 10% OFF"; font-size: 11px; }
+aside > form:has(input[placeholder="Coupon code"]) input { height: 48px; min-width: 0; flex: 1; border: 2px solid #cbdcc7; border-radius: 12px; padding: 0 16px; background: #fff; font-size: 14px; font-weight: 600; outline: none; }
+aside > form:has(input[placeholder="Coupon code"]) input:focus { border-color: #5b8b54; }
+aside > form:has(input[placeholder="Coupon code"]) button { height: 48px; border-radius: 12px; padding: 0 24px; background: #3f7b4a; color: #fff; font-size: 14px; font-weight: 700; }
 .soft-grid {
   background-image: radial-gradient(#e2eadf 0.8px, transparent 0.8px);
   background-size: 15px 15px;
