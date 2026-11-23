@@ -139,7 +139,8 @@ def _create_order(user, address, payment_method, coupon_code=""):
             raise ValueError("That coupon code is not valid.") from exc
         if not coupon.is_valid():
             raise ValueError("That coupon has expired or is inactive.")
-        discount = (subtotal * Decimal(coupon.discount_percent) / Decimal("100")).quantize(Decimal("0.01"))
+        discount = coupon.discount_amount if coupon.discount_amount else (subtotal * Decimal(coupon.discount_percent) / Decimal("100"))
+        discount = min(discount, subtotal).quantize(Decimal("0.01"))
 
     address_data = AddressSerializer(address).data
     order = Order.objects.create(
@@ -414,10 +415,18 @@ class CouponCheckView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        code = str(request.data.get("code", "")).strip().upper()
+        defaults = {
+            "RENEW10": {"discount_percent": 10, "discount_amount": 0},
+            "FIRST50": {"discount_percent": 1, "discount_amount": 50},
+            "STUDENT20": {"discount_percent": 20, "discount_amount": 0},
+        }
         try:
-            coupon = Coupon.objects.get(code__iexact=str(request.data.get("code", "")).strip())
+            coupon = Coupon.objects.get(code__iexact=code)
         except Coupon.DoesNotExist:
-            return Response({"detail": "That coupon code is not valid."}, status=status.HTTP_400_BAD_REQUEST)
+            if code not in defaults:
+                return Response({"detail": "That coupon code is not valid."}, status=status.HTTP_400_BAD_REQUEST)
+            coupon = Coupon.objects.create(code=code, active=True, **defaults[code])
         if not coupon.is_valid():
             return Response({"detail": "That coupon has expired or is inactive."}, status=status.HTTP_400_BAD_REQUEST)
         return Response(CouponSerializer(coupon).data)
@@ -584,7 +593,8 @@ class ExchangeEstimateView(APIView):
         serializer = ExchangeRequestSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         values = serializer.validated_data
-        base = Decimal("4000") if values["product_type"] == "mobile" else Decimal("12000")
+        base_values = {"mobile": Decimal("4000"), "mobiles": Decimal("4000"), "laptop": Decimal("12000"), "laptops": Decimal("12000"), "books": Decimal("500"), "tablets": Decimal("6000"), "smart-watches": Decimal("2500"), "headphones-earbuds": Decimal("1800"), "cameras": Decimal("9000")}
+        base = base_values[values["product_type"]]
         condition_factor = {"like_new": Decimal("0.8"), "good": Decimal("0.6"), "average": Decimal("0.4")}
         estimate = (base * condition_factor[values["condition"]]).quantize(Decimal("0.01"))
         submission = serializer.save(user=request.user, estimate=estimate)

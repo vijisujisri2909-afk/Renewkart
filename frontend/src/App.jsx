@@ -45,11 +45,13 @@ function App() {
   const [cart, setCart] = useState([]);
   const [wish, setWish] = useState([]);
   const [toast, setToast] = useState("");
+  const [toastTone, setToastTone] = useState("default");
   const [chatOpen, setChatOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const notify = useCallback((message) => {
+  const notify = useCallback((message, tone = "default") => {
     setToast(message);
+    setToastTone(tone);
     window.setTimeout(() => setToast(""), 3200);
   }, []);
 
@@ -178,7 +180,7 @@ function App() {
         <Footer />
         {location.pathname === "/" && <button type="button" className="whatsapp-float" onClick={() => setChatOpen(true)} aria-label="Open ReNewKart chat"><MessageCircle size={23} /><span>Chat with us</span></button>}
         {chatOpen && <ChatBot onClose={() => setChatOpen(false)} />}
-        {toast && <div role="status" className="fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-full bg-[#1f3328] px-5 py-3 text-sm font-semibold text-white shadow-xl">{toast}</div>}
+        {toast && <div role="status" className={`fixed bottom-5 left-1/2 z-[80] -translate-x-1/2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-xl ${toastTone === "error" ? "bg-[#a94f47]" : toastTone === "success" ? "bg-[#3f7b4a]" : "bg-[#1f3328]"}`}>{toast}</div>}
       </div>
     </StoreContext.Provider>
   );
@@ -690,6 +692,9 @@ function Shop() {
     <div className="mx-auto max-w-[1400px] px-5 py-9 sm:px-10 lg:px-12">
       <PriceRangeFilter min={filters.min_price} max={filters.max_price} onApply={applyPriceFilter} onClear={clearPriceFilter} />
       <div className="mt-5">
+          <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Product categories">
+            {[{ id: "all", slug: "", name: "All" }, ...categories.filter((category) => category.slug !== "exchange-zone")].map((category) => <button key={category.id} type="button" role="tab" aria-selected={filters.category === category.slug} onClick={() => update("category", category.slug)} className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${filters.category === category.slug ? "border-[#507b4d] bg-[#507b4d] text-white shadow-sm" : "border-[#dfe8dc] bg-white text-[#5a725b] hover:border-[#9cbd92] hover:bg-[#f0f6ed]"}`}>{category.name.replace(" & Earbuds", "")}</button>)}
+          </div>
           <div className="mb-7 grid gap-3 rounded-2xl border border-[#e7ebe4] bg-white p-4 sm:grid-cols-2 lg:grid-cols-5">
             <label className="relative sm:col-span-2 lg:col-span-2"><Search size={16} className="absolute left-3 top-3.5 text-[#93a093]" /><input value={searchDraft} onChange={(e) => setSearchDraft(e.target.value)} onKeyDown={submitSearch} placeholder="Search by name, brand, or category" className="h-11 w-full rounded-xl border border-[#e8ede6] pl-9 pr-3 text-sm outline-none focus:border-[#9dbb91]" /></label>
             <select value={filters.category} onChange={(e) => update("category", e.target.value)} className="h-11 rounded-xl border border-[#e8ede6] bg-white px-3 text-sm text-[#536156]"><option value="">All categories</option>{categories.filter((c) => c.slug !== "exchange-zone").map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select>
@@ -792,11 +797,13 @@ function ProductPage() {
 function CartPage() {
   const { cart, refreshCounts, notify } = useStore();
   const [coupon, setCoupon] = useState("");
-  const [applied, setApplied] = useState(null);
+  const [applied, setApplied] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("renewkart_coupon") || "null"); } catch { return null; }
+  });
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const subtotal = cart.reduce((sum, item) => sum + Number(item.line_total), 0);
-  const discount = applied ? subtotal * applied.discount_percent / 100 : 0;
+  const discount = applied ? Math.min(Number(applied.discount_amount) || subtotal * Number(applied.discount_percent) / 100, subtotal) : 0;
   const changeQuantity = async (item, quantity) => {
     try { await api.patch("/cart/", { item_id: item.id, quantity }); await refreshCounts(); }
     catch (error) { notify(errorMessage(error)); }
@@ -808,10 +815,23 @@ function CartPage() {
   const applyCoupon = async (e) => {
     e.preventDefault();
     setBusy(true);
-    try { const { data } = await api.post("/coupons/check/", { code: coupon }); setApplied(data); notify(`${data.discount_percent}% discount applied.`); }
-    catch (error) { setApplied(null); notify(errorMessage(error)); }
+    try {
+      const { data } = await api.post("/coupons/check/", { code: coupon.trim().toUpperCase() });
+      setApplied(data);
+      localStorage.setItem("renewkart_coupon", JSON.stringify(data));
+      const saved = Math.min(Number(data.discount_amount) || subtotal * Number(data.discount_percent) / 100, subtotal);
+      notify(`Coupon Applied! You saved ${money(saved)}`, "success");
+    } catch (error) {
+      setApplied(null);
+      localStorage.removeItem("renewkart_coupon");
+      notify("Invalid Coupon", "error");
+    }
     finally { setBusy(false); }
   };
+  useEffect(() => {
+    const input = document.querySelector('input[placeholder="Coupon code"]');
+    if (input) input.placeholder = "Enter Coupon Code";
+  }, []);
   return <main><PageIntro eyebrow="Your good finds" title="Your cart." text="A few more steps and these finds will be on their way to you." /><div className="mx-auto grid max-w-[1200px] gap-7 px-5 py-9 sm:px-10 lg:grid-cols-[1.5fr_.8fr] lg:px-12">
     <div className="space-y-3">{cart.length ? cart.map((item) => <article key={item.id} className="flex gap-4 rounded-[20px] border border-[#e8ede5] bg-white p-3 sm:gap-5 sm:p-4"><Link to={`/product/${item.product.slug}`} className="size-24 shrink-0 overflow-hidden rounded-2xl bg-[#eff2ed] sm:size-32"><img src={localProductImage(item.product)} alt={item.product.name} className="h-full w-full object-cover" /></Link><div className="flex min-w-0 flex-1 flex-col justify-between py-1"><div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#95a095]">{item.product.brand}</p><Link to={`/product/${item.product.slug}`} className="mt-1 line-clamp-2 font-display text-sm font-extrabold text-[#304334]">{item.product.name}</Link><p className="mt-1 text-[10px] text-[#829082]">{conditionText[item.product.condition]} condition</p></div><button onClick={() => remove(item)} aria-label="Remove item" className="p-1 text-[#a3ada3] hover:text-[#c76058]"><Trash2 size={17} /></button></div><div className="mt-2 flex items-end justify-between gap-2"><div className="flex h-8 items-center rounded-full border border-[#e4e9e2]"><button onClick={() => changeQuantity(item, Math.max(1, item.quantity - 1))} disabled={item.quantity <= 1} aria-label="Decrease quantity" className="grid size-8 place-items-center disabled:opacity-30"><Minus size={13} /></button><span className="w-5 text-center text-xs font-bold">{item.quantity}</span><button onClick={() => changeQuantity(item, item.quantity + 1)} aria-label="Increase quantity" className="grid size-8 place-items-center"><Plus size={13} /></button></div><p className="font-display text-base font-extrabold text-[#304334]">{money(item.line_total)}</p></div></div></article>) : <EmptyState icon={ShoppingBag} title="Nothing in your cart just yet." text="Your next great find is waiting." action={<Link to="/shop" className="button-primary rounded-full px-5 py-3 text-xs font-bold text-white">Explore the shop</Link>} />}
     </div>
@@ -831,13 +851,15 @@ function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const subtotal = cart.reduce((sum, item) => sum + Number(item.line_total), 0);
-  const couponCode = searchParams.get("coupon") || location.state?.couponCode || "";
+  const couponCode = searchParams.get("coupon") || location.state?.couponCode || (() => {
+    try { return JSON.parse(localStorage.getItem("renewkart_coupon") || "null")?.code || ""; } catch { return ""; }
+  })();
   const [coupon, setCoupon] = useState(null);
   useEffect(() => {
     if (!user || !couponCode) { setCoupon(null); return; }
     api.post("/coupons/check/", { code: couponCode }).then(({ data }) => setCoupon(data)).catch((error) => { setCoupon(null); notify(errorMessage(error)); });
   }, [couponCode, notify, user]);
-  const discount = coupon ? subtotal * coupon.discount_percent / 100 : 0;
+  const discount = coupon ? Math.min(Number(coupon.discount_amount) || subtotal * Number(coupon.discount_percent) / 100, subtotal) : 0;
   useEffect(() => {
     if (!user) return;
     api.get("/addresses/").then(({ data }) => {
@@ -1015,7 +1037,8 @@ function Wishlist() {
 
 function Exchange() {
   const { user, notify } = useStore();
-  const [form, setForm] = useState({ product_type: "mobile", product_name: "", condition: "good", description: "" });
+  const [categories, setCategories] = useState([]);
+  const [form, setForm] = useState({ product_type: "mobiles", product_name: "", condition: "good", description: "" });
   const [photos, setPhotos] = useState([]);
   const [photoError, setPhotoError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -1023,6 +1046,21 @@ function Exchange() {
   const [busy, setBusy] = useState(false);
   const photoInput = useRef(null);
   const previewUrls = useRef(new Set());
+  useEffect(() => {
+    api.get("/categories/")
+      .then(({ data }) => setCategories((data.results || data).filter((category) => category.slug !== "exchange-zone")))
+      .catch((error) => notify(errorMessage(error)));
+  }, [notify]);
+  useEffect(() => {
+    if (!categories.length) return;
+    const categorySelect = [...document.querySelectorAll("select")].find((select) => [...select.options].some((option) => option.value === "mobile" && option.textContent === "Mobile phone"));
+    if (categorySelect) {
+      categorySelect.replaceChildren(new Option("Choose a category", ""), ...categories.map((category) => new Option(category.slug === "headphones-earbuds" ? "Headphones" : category.name, category.slug)));
+      categorySelect.value = form.product_type;
+    }
+    const modelInput = document.querySelector('input[placeholder="e.g. Samsung Galaxy S21"]');
+    if (modelInput) modelInput.placeholder = "Ex: iPhone 13, HP Pavilion, etc";
+  }, [categories, form.product_type]);
   useEffect(() => () => previewUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
   const addPhotos = (fileList) => {
     const files = Array.from(fileList || []);

@@ -105,6 +105,7 @@ class Address(models.Model):
 class Coupon(models.Model):
     code = models.CharField(max_length=30, unique=True)
     discount_percent = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(90)])
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     active = models.BooleanField(default=True)
     expires_at = models.DateTimeField(null=True, blank=True)
 
@@ -173,7 +174,7 @@ class Review(models.Model):
 
 
 class ExchangeRequest(models.Model):
-    TYPE_CHOICES = [("mobile", "Mobile"), ("laptop", "Laptop")]
+    TYPE_CHOICES = [("mobile", "Mobile"), ("laptop", "Laptop"), ("mobiles", "Mobiles"), ("laptops", "Laptops"), ("books", "Books"), ("tablets", "Tablets"), ("smart-watches", "Smart Watches"), ("headphones-earbuds", "Headphones"), ("cameras", "Cameras")]
     CONDITION_CHOICES = Product.CONDITION_CHOICES
     STATUS_CHOICES = [("received", "Received"), ("reviewing", "Reviewing"), ("quoted", "Quoted"), ("completed", "Completed")]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="exchange_requests", on_delete=models.CASCADE)

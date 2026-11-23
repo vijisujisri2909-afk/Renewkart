@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: "Poppins", sans-serif;
   color: #17231c;
   background: #f7f8f5;
   font-synthesis: none;
@@ -14,7 +14,7 @@ button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 img { display: block; }
-.font-display { font-family: "Manrope", sans-serif; }
+.font-display, h1, h2, h3, h4, h5, h6, button, .button-primary { font-family: "Dancing Script", cursive; }
 .soft-grid {
   background-image: radial-gradient(#e2eadf 0.8px, transparent 0.8px);
   background-size: 15px 15px;
@@ -66,7 +66,7 @@ img { display: block; }
   position: relative;
   display: inline-flex;
   align-items: baseline;
-  font-family: "Manrope", sans-serif;
+  font-family: "Dancing Script", cursive;
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -1.3px;
@@ -152,7 +152,8 @@ img { display: block; }
 .hero-leaf-one { top: 19%; left: 48%; width: 24px; animation: hero-leaf-drift 8s ease-in-out infinite; }
 .hero-leaf-two { right: 9%; bottom: 15%; width: 32px; transform: rotate(38deg); animation: hero-leaf-drift 9s ease-in-out -3s infinite; }
 .hero-kicker { animation: hero-kicker-pulse 3s ease-in-out infinite; }
-.hero-title { transform-origin: left center; animation: hero-title-breathe 6s ease-in-out infinite; }
+.hero-title { transform-origin: center center; text-align: center; animation: hero-title-breathe 6s ease-in-out infinite, hero-title-glow 4s ease-in-out 1.2s infinite; }
+.hero-title .hero-highlight { animation: hero-highlight-in 900ms cubic-bezier(.2,.8,.2,1) 650ms both; }
 .hero-title-line { display: inline-block; white-space: nowrap; }
 .hero-highlight { position: relative; z-index: 0; display: inline-block; color: #16a34a; }
 .hero-word { display: inline-block; opacity: 0; animation: hero-word-in 650ms cubic-bezier(.2,.8,.2,1) forwards; }
@@ -576,6 +577,14 @@ img { display: block; }
 @keyframes hero-title-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
+}
+@keyframes hero-title-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(22, 163, 74, 0)); }
+  50% { filter: drop-shadow(0 8px 22px rgba(22, 163, 74, .2)); }
+}
+@keyframes hero-highlight-in {
+  from { opacity: 0; transform: translateY(18px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes icon-bounce {
   0%, 100% { transform: translateY(0); }

@@ -169,7 +169,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 class CouponSerializer(serializers.ModelSerializer):
     class Meta:
         model = Coupon
-        fields = ["id", "code", "discount_percent", "active", "expires_at"]
+        fields = ["id", "code", "discount_percent", "discount_amount", "active", "expires_at"]
 
 
 class ExchangeRequestSerializer(serializers.ModelSerializer):

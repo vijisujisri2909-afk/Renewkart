@@ -5,7 +5,7 @@ from store.models import Category, Coupon, Product
 
 
 class Command(BaseCommand):
-    help = "Create the ReNewKart catalogue and RENEW10 coupon."
+    help = "Create the ReNewKart catalogue and starter coupons."
 
     def handle(self, *args, **options):
         categories = {
@@ -130,5 +130,7 @@ class Command(BaseCommand):
                     ),
                 },
             )
-        Coupon.objects.update_or_create(code="RENEW10", defaults={"discount_percent": 10, "active": True})
-        self.stdout.write(self.style.SUCCESS("Starter catalogue ready: 7 categories, 47 products, RENEW10 coupon."))
+        Coupon.objects.update_or_create(code="RENEW10", defaults={"discount_percent": 10, "discount_amount": 0, "active": True})
+        Coupon.objects.update_or_create(code="FIRST50", defaults={"discount_percent": 1, "discount_amount": 50, "active": True})
+        Coupon.objects.update_or_create(code="STUDENT20", defaults={"discount_percent": 20, "discount_amount": 0, "active": True})
+        self.stdout.write(self.style.SUCCESS("Starter catalogue ready: 7 categories, 47 products and 3 coupons."))

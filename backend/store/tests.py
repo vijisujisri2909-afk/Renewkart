@@ -227,6 +227,17 @@ class StoreFlowTests(APITestCase):
         self.assertTrue(all(photo["url"].startswith("http://testserver/") for photo in response.data["photos"]))
         self.assertEqual(request.photos.count(), 3)
 
+    def test_exchange_request_accepts_additional_catalogue_categories(self):
+        for product_type in ("books", "tablets", "smart-watches", "headphones-earbuds", "cameras"):
+            with self.subTest(product_type=product_type):
+                response = self.client.post(
+                    "/api/exchange/estimate/",
+                    {"product_type": product_type, "product_name": "Test item", "condition": "good"},
+                    format="multipart",
+                )
+                self.assertEqual(response.status_code, 201)
+                self.assertGreater(float(response.data["estimate"]), 0)
+
     def test_exchange_request_rejects_more_than_three_photos(self):
         image_buffer = BytesIO()
         Image.new("RGB", (2, 2), color="green").save(image_buffer, format="PNG")
@@ -298,6 +309,8 @@ class StoreFlowTests(APITestCase):
             is_default=True,
         )
         Coupon.objects.create(code="RENEW10", discount_percent=10)
+        Coupon.objects.create(code="FIRST50", discount_percent=1, discount_amount=50)
+        Coupon.objects.create(code="STUDENT20", discount_percent=20)
         add_response = self.client.post("/api/cart/", {"product_id": self.product.id, "quantity": 2}, format="json")
         self.assertEqual(add_response.status_code, 201)
 
